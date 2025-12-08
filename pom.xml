@@ -33,6 +33,11 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>commons-collections</groupId>
+      <artifactId>commons-collections</artifactId>
+      <version>3.2.1</version> <!-- Contains CVE-2015-6420 -->
+    </dependency>
   </dependencies>
 
   <build>
