@@ -1,13 +1,13 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- Downgraded Spring Boot parent to trigger Snyk alerts -->
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.0</version>
+    <version>3.1.0</version> <!-- Vulnerable version -->
     <relativePath/>
   </parent>
 
@@ -24,26 +24,37 @@
   </properties>
 
   <dependencies>
+    <!-- Core Spring Boot Web -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+
+    <!-- Spring Boot Test -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- Vulnerable dependency: Commons Collections -->
     <dependency>
       <groupId>commons-collections</groupId>
       <artifactId>commons-collections</artifactId>
       <version>3.2.1</version> <!-- Contains CVE-2015-6420 -->
+    </dependency>
+
+    <!-- Optional: Add another known vulnerable library -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>2.14.1</version> <!-- Contains Log4Shell CVE-2021-44228 -->
     </dependency>
   </dependencies>
 
   <build>
     <!-- Force Maven to produce target/myapp.jar -->
     <finalName>myapp</finalName>
-
     <plugins>
       <!-- Spring Boot Plugin -->
       <plugin>
@@ -82,7 +93,8 @@
                 <limit>
                   <counter>LINE</counter>
                   <value>COVEREDRATIO</value>
-                  <minimum>0.80</minimum> <!-- Enforce 80% line coverage -->
+                  <minimum>0.80</minimum>
+                  <!-- Enforce 80% line coverage -->
                 </limit>
               </limits>
             </rule>
@@ -98,5 +110,4 @@
       </plugin>
     </plugins>
   </build>
-
 </project>
