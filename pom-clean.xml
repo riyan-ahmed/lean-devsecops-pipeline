@@ -3,19 +3,19 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- Downgraded Spring Boot parent to trigger Snyk alerts -->
+  <!-- Secure Spring Boot parent -->
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.1.0</version> <!-- Vulnerable version -->
+    <version>3.2.5</version>
     <relativePath/>
   </parent>
 
   <groupId>com.example</groupId>
-  <artifactId>Lean-DevSecOps</artifactId>
+  <artifactId>Lean-DevSecOps-Clean</artifactId>
   <version>0.0.1-SNAPSHOT</version>
-  <name>Lean-DevSecOps</name>
-  <description>Lean DevSecOps Spring Boot Project for CI/CD and SonarCloud Integration</description>
+  <name>Lean-DevSecOps-Clean</name>
+  <description>Secure Spring Boot project with CI/CD, SonarCloud, Jacoco integration</description>
 
   <properties>
     <java.version>17</java.version>
@@ -36,30 +36,9 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-
-    <!-- Vulnerable dependency: Commons Collections -->
-    <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-      <version>3.2.1</version> <!-- Contains CVE-2015-6420 -->
-    </dependency>
-
-    <!-- Vulnerable dependency: Log4j (Log4Shell) -->
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-core</artifactId>
-      <version>2.14.1</version> <!-- Contains CVE-2021-44228 -->
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-api</artifactId>
-      <version>2.14.1</version>
-    </dependency>
   </dependencies>
 
   <build>
-    <!-- Force Maven to produce target/myapp.jar -->
     <finalName>myapp</finalName>
     <plugins>
       <!-- Spring Boot Plugin -->
@@ -76,16 +55,12 @@
         <executions>
           <execution>
             <id>prepare-agent</id>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
+            <goals><goal>prepare-agent</goal></goals>
           </execution>
           <execution>
             <id>report</id>
             <phase>verify</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
+            <goals><goal>report</goal></goals>
           </execution>
         </executions>
         <configuration>
@@ -100,7 +75,6 @@
                   <counter>LINE</counter>
                   <value>COVEREDRATIO</value>
                   <minimum>0.80</minimum>
-                  <!-- Enforce 80% line coverage -->
                 </limit>
               </limits>
             </rule>

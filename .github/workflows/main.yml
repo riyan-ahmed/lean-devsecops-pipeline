@@ -1,4 +1,4 @@
-name: Java CI with Maven (SAST + Snyk SCA + Docker Scan)
+name: DevSecOps Demo (Clean vs Vulnerable)
 
 on:
   push:
@@ -8,139 +8,167 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # Needed to upload SARIF to GitHub Security tab
+  security-events: write
 
 jobs:
-  build-and-analyze:
+  clean-build:
     runs-on: ubuntu-latest
+    name: Clean Build (Secure Dependencies)
 
     steps:
-      # --- STEP 0: Checkout Code ---
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # --- STEP 1: Set up Java ---
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
 
-      # --- STEP 2: Cache SonarCloud packages ---
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v4
+      - name: Build and Test (Clean POM)
+        run: ./mvnw -B verify --file pom-clean.xml
+
+      # Coverage evidence
+      - name: Upload Jacoco Coverage Report (Clean)
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
+          name: jacoco-clean-report
+          path: target/site/jacoco/
 
-      # --- STEP 3: Cache Maven packages ---
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-
-      # --- STEP 4: Make mvnw executable ---
-      - name: Make mvnw executable
-        run: chmod +x mvnw
-
-      # --- STEP 5: Build and Test ---
-      - name: Build and Test with Maven
-        run: ./mvnw -B verify
-
-      # --- STEP 6: SonarCloud Analysis (SAST) ---
-      - name: Analyze with SonarCloud
-        if: success()
+      # SonarCloud analysis
+      - name: SonarCloud Analysis (Clean)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./mvnw org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
-            -Dsonar.projectKey=zm24acgRiyan_Lean-DevSecOps \
-            -Dsonar.organization=zm24acgriyan \
+          ./mvnw sonar:sonar --file pom-clean.xml \
+            -Dsonar.projectKey=riyan_clean_demo \
+            -Dsonar.organization=riyan-org \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
-      # --- STEP 7: Verify Java Setup ---
-      - name: Verify Java Setup
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          java -version
-          ./mvnw -v
-
-      # --- STEP 8: Install Snyk CLI ---
+      # Snyk SCA
       - name: Install Snyk CLI
-        if: success()
         uses: snyk/actions/setup@master
-
-      # --- STEP 9: Authenticate Snyk ---
       - name: Authenticate Snyk
-        if: success()
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: snyk auth "$SNYK_TOKEN"
-
-      # --- STEP 10: Run Snyk SCA Scan (continue even if vulnerable) ---
-      - name: Run Snyk SCA
-        continue-on-error: true   # <-- allows evidence capture before failing
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Run Snyk SCA (Clean)
+        continue-on-error: true
+        run: snyk test --file=pom-clean.xml --severity-threshold=high \
+          --json-file-output=snyk-clean.json \
+          --sarif-file-output=snyk-clean.sarif
+      - name: Upload Snyk SARIF (Clean)
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: snyk-clean.sarif
+      - name: Pass if no vulnerabilities (Clean)
         run: |
-          echo "Running Snyk Test..."
-          snyk test --file=pom.xml \
-                    --severity-threshold=high \
-                    --json-file-output=snyk.json \
-                    --sarif-file-output=snyk.sarif
+          if grep -Eq '"severity": "(high|critical)"' snyk-clean.json; then
+            echo "Unexpected vulnerabilities found in clean build!"
+            exit 1
+          else
+            echo "No high/critical vulnerabilities found. Clean pipeline passes."
+          fi
 
-      # --- STEP 11: Upload Snyk artifact (JSON + SARIF) ---
-      - name: Upload Snyk Scan Reports
+      # Trivy container scan (non-blocking)
+      - name: Build Docker Image (Clean)
+        run: docker build -t myapp-clean:latest .
+      - name: Scan Docker Image with Trivy (Clean)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: myapp-clean:latest
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-clean.sarif
+          exit-code: 0
+          ignore-unfixed: true
+      - name: Upload Trivy SARIF (Clean)
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-clean.sarif
+
+  vulnerable-build:
+    runs-on: ubuntu-latest
+    name: Vulnerable Build (Log4j Failure)
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Build and Test (Vulnerable POM)
+        run: ./mvnw -B verify --file pom-vulnerable.xml
+
+      # Coverage evidence
+      - name: Upload Jacoco Coverage Report (Vulnerable)
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: snyk-scan-reports
-          path: |
-            snyk.json
-            snyk.sarif
+          name: jacoco-vuln-report
+          path: target/site/jacoco/
 
-      # --- STEP 12: Upload Snyk SARIF to GitHub Security ---
-      - name: Upload Snyk SARIF to GitHub Security Tab
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: snyk.sarif
-
-      # --- STEP 13: Build Docker Image ---
-      - name: Build Docker Image
-        run: docker build -t myapp:latest .
-
-      # --- STEP 14: Scan Docker Image with Trivy (non-blocking) ---
-      - name: Scan Docker Image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: myapp:latest
-          severity: HIGH,CRITICAL
-          format: sarif
-          output: trivy.sarif
-          exit-code: 0        # <-- Do not fail pipeline
-          ignore-unfixed: true
-
-      # --- STEP 15: Upload Trivy SARIF to GitHub Security Tab ---
-      - name: Upload Trivy SARIF to GitHub Security Tab
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
-        with:
-          sarif_file: trivy.sarif
-
-      # --- STEP 16: Fail if Snyk found high/critical severity issues ---
-      - name: Fail if Snyk found issues
+      # SonarCloud analysis
+      - name: SonarCloud Analysis (Vulnerable)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          if grep -Eq '"severity": "(high|critical)"' snyk.json; then
-            echo "High or critical severity vulnerabilities found. Failing pipeline."
+          ./mvnw sonar:sonar --file pom-vulnerable.xml \
+            -Dsonar.projectKey=riyan_vuln_demo \
+            -Dsonar.organization=riyan-org \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+
+      # Snyk SCA
+      - name: Install Snyk CLI
+        uses: snyk/actions/setup@master
+      - name: Authenticate Snyk
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk auth "$SNYK_TOKEN"
+      - name: Run Snyk SCA (Vulnerable)
+        continue-on-error: true
+        run: snyk test --file=pom-vulnerable.xml --severity-threshold=high \
+          --json-file-output=snyk-vuln.json \
+          --sarif-file-output=snyk-vuln.sarif
+      - name: Upload Snyk SARIF (Vulnerable)
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: snyk-vuln.sarif
+      - name: Fail if vulnerabilities found (Vulnerable)
+        run: |
+          if grep -Eq '"severity": "(high|critical)"' snyk-vuln.json; then
+            echo "High/critical vulnerabilities found (Log4j CVE-2021-44228). Failing pipeline."
             exit 1
           else
-            echo "No high/critical vulnerabilities found. Pipeline passes."
+            echo "No high/critical vulnerabilities found. Vulnerable pipeline passes unexpectedly."
           fi
+
+      # Trivy container scan (non-blocking)
+      - name: Build Docker Image (Vulnerable)
+        run: docker build -t myapp-vuln:latest .
+      - name: Scan Docker Image with Trivy (Vulnerable)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: myapp-vuln:latest
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-vuln.sarif
+          exit-code: 0
+          ignore-unfixed: true
+      - name: Upload Trivy SARIF (Vulnerable)
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: trivy-vuln.sarif
