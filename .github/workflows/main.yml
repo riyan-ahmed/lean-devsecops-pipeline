@@ -135,12 +135,12 @@ jobs:
         with:
           sarif_file: trivy.sarif
 
-      # --- STEP 16: Fail if Snyk found high severity issues ---
+      # --- STEP 16: Fail if Snyk found high/critical severity issues ---
       - name: Fail if Snyk found issues
         run: |
-          if grep -q '"severity": "high"' snyk.json; then
-            echo "High severity vulnerabilities found. Failing pipeline."
+          if grep -Eq '"severity": "(high|critical)"' snyk.json; then
+            echo "High or critical severity vulnerabilities found. Failing pipeline."
             exit 1
           else
-            echo "No high severity vulnerabilities found. Pipeline passes."
+            echo "No high/critical vulnerabilities found. Pipeline passes."
           fi
