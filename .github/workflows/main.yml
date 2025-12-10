@@ -8,7 +8,7 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # Needed to upload SARIF to GitHub
+  security-events: write   # Needed to upload SARIF to GitHub Security tab
 
 jobs:
   build-and-analyze:
@@ -82,21 +82,19 @@ jobs:
         if: success()
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          snyk auth "$SNYK_TOKEN"
-          echo "Snyk authentication complete."
+        run: snyk auth "$SNYK_TOKEN"
 
-      # --- STEP 10: Run Snyk SCA Scan ---
+      # --- STEP 10: Run Snyk SCA Scan (continue even if vulnerable) ---
       - name: Run Snyk SCA
-        if: success()
+        continue-on-error: true   # <-- allows evidence capture before failing
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           echo "Running Snyk Test..."
-          snyk test --all-projects \
-                     --severity-threshold=high \
-                     --json-file-output=snyk.json \
-                     --sarif-file-output=snyk.sarif || true
+          snyk test --file=pom.xml \
+                    --severity-threshold=high \
+                    --json-file-output=snyk.json \
+                    --sarif-file-output=snyk.sarif
 
       # --- STEP 11: Upload Snyk artifact (JSON + SARIF) ---
       - name: Upload Snyk Scan Reports
@@ -119,7 +117,7 @@ jobs:
       - name: Build Docker Image
         run: docker build -t myapp:latest .
 
-      # --- STEP 14: Scan Docker Image with Trivy ---
+      # --- STEP 14: Scan Docker Image with Trivy (non-blocking) ---
       - name: Scan Docker Image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
@@ -136,3 +134,13 @@ jobs:
         if: always()
         with:
           sarif_file: trivy.sarif
+
+      # --- STEP 16: Fail if Snyk found high severity issues ---
+      - name: Fail if Snyk found issues
+        run: |
+          if grep -q '"severity": "high"' snyk.json; then
+            echo "High severity vulnerabilities found. Failing pipeline."
+            exit 1
+          else
+            echo "No high severity vulnerabilities found. Pipeline passes."
+          fi
