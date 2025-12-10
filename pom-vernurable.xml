@@ -3,24 +3,24 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- Downgraded Spring Boot parent to trigger Snyk alerts -->
+    <!-- Secure baseline but intentionally vulnerable dependencies -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.1.0</version> <!-- Vulnerable version -->
+        <version>3.2.5</version> <!-- Secure baseline -->
         <relativePath/>
     </parent>
 
     <groupId>com.example</groupId>
-    <artifactId>Lean-DevSecOps-Vulnerable</artifactId>
+    <artifactId>log4j-failure-demo</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>Lean-DevSecOps-Vulnerable</name>
-    <description>Spring Boot project with intentionally vulnerable dependencies for CI/CD demo</description>
+    <name>Log4j Failure Demo</name>
+    <description>Spring Boot project with Log4j CVE to demonstrate SAST, SCA, coverage, and container scanning</description>
 
     <properties>
         <java.version>17</java.version>
         <jacoco.version>0.8.11</jacoco.version>
-        <main.class.path>com/example/leandevsecops/LeanDevSecOpsApplication.class</main.class.path>
+        <main.class.path>com/example/demo/DemoApplication.class</main.class.path>
     </properties>
 
     <dependencies>
@@ -37,14 +37,7 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Vulnerable dependency: Commons Collections -->
-        <dependency>
-            <groupId>commons-collections</groupId>
-            <artifactId>commons-collections</artifactId>
-            <version>3.2.1</version> <!-- Contains CVE-2015-6420 -->
-        </dependency>
-
-        <!-- Vulnerable dependency: Log4j (Log4Shell) -->
+        <!-- Intentionally vulnerable Log4j dependency -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
@@ -66,7 +59,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
 
-            <!-- Jacoco Plugin -->
+            <!-- Jacoco Plugin for coverage enforcement -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
@@ -74,12 +67,16 @@
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
-                        <goals><goal>prepare-agent</goal></goals>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
                     </execution>
                     <execution>
                         <id>report</id>
                         <phase>verify</phase>
-                        <goals><goal>report</goal></goals>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
                     </execution>
                 </executions>
                 <configuration>
@@ -94,6 +91,7 @@
                                     <counter>LINE</counter>
                                     <value>COVEREDRATIO</value>
                                     <minimum>0.80</minimum>
+                                    <!-- Enforce 80% line coverage -->
                                 </limit>
                             </limits>
                         </rule>
@@ -101,7 +99,7 @@
                 </configuration>
             </plugin>
 
-            <!-- SonarCloud Plugin -->
+            <!-- SonarCloud Plugin for SAST -->
             <plugin>
                 <groupId>org.sonarsource.scanner.maven</groupId>
                 <artifactId>sonar-maven-plugin</artifactId>
