@@ -1,4 +1,4 @@
-package com.example.leandevsecops; // <-- FIXED
+package com.example.leandevsecops;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -9,5 +9,4 @@ public class LeanDevSecOpsApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(LeanDevSecOpsApplication.class, args);
 	}
-	
 }

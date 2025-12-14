@@ -1,4 +1,4 @@
-package com.example.leandevsecops; // <-- FIXED
+package com.example.leandevsecops;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -6,8 +6,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class DemoController {
 
-	@GetMapping("/")
-	public String hello() {
-		return "Hello, this is the main application!";
+	@GetMapping("/health")
+	public String health() {
+		return "OK";
 	}
 }
