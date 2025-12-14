@@ -9,20 +9,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # --- Checkout Code ---
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # --- Set up Java ---
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Cache Maven
+      # --- Cache Maven Dependencies ---
+      - name: Cache Maven packages
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
-      - name: Build & Test (Baseline)
+      # --- FIX: Make Maven Wrapper Executable ---
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
+      # --- Build & Test (Baseline) ---
+      - name: Build and Test with Maven
         run: ./mvnw -B clean verify
