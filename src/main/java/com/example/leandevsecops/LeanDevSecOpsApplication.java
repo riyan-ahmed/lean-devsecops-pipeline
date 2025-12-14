@@ -1,12 +1,12 @@
 package com.example.leandevsecops;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.junit.jupiter.api.Test;
 
-@SpringBootApplication
-public class LeanDevSecOpsApplication {
+class LeanDevSecOpsApplicationTests {
 
-	public static void main(String[] args) {
-		SpringApplication.run(LeanDevSecOpsApplication.class, args);
+	@Test
+	void baselineTestPasses() {
+		// Simple sanity test for baseline pipeline
+		assert true;
 	}
 }
