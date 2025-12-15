@@ -17,7 +17,7 @@ public class DemoControllerTest {
     @Test
     public void testHelloEndpoint() throws Exception {
         mockMvc.perform(get("/"))
-               .andExpect(status().isOk())
-               .andExpect(content().string("Hello, this is the main application!"));
+                .andExpect(status().isOk())
+                .andExpect(content().string("Hello, this is the main application!"));
     }
 }
