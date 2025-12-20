@@ -1,10 +1,15 @@
-# Build stage
-FROM eclipse-temurin:17-jdk-alpine AS build
+# Runtime image only (build happens in CI)
+FROM eclipse-temurin:17-jre-alpine
+
 WORKDIR /app
+
+# Create a non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Copy the built JAR
 COPY target/myapp.jar app.jar
 
-# Runtime stage (smaller, fewer CVEs)
-FROM eclipse-temurin:17-jre-alpine
-WORKDIR /app
-COPY --from=build /app/app.jar app.jar
+# Drop privileges
+USER appuser
+
 ENTRYPOINT ["java","-jar","app.jar"]

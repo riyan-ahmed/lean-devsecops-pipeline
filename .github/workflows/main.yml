@@ -1,4 +1,4 @@
-name: Java CI with Maven (SAST + Snyk SCA + Docker Scan)
+name: Java CI with Maven (SAST + Snyk SCA + Trivy Docker Scan)
 
 on:
   push:
@@ -8,97 +8,85 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # Needed to upload SARIF to GitHub
+  security-events: write
 
 jobs:
   build-and-analyze:
     runs-on: ubuntu-latest
 
+    env:
+      JAVA_VERSION: "17"
+      IMAGE_NAME: "myapp"
+      # Set to "true" if you want Trivy/Snyk to fail the pipeline on findings
+      ENFORCE_SECURITY: "false"
+
     steps:
-      # --- STEP 0: Checkout Code ---
+      # --- 1) Checkout ---
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # --- STEP 1: Set up Java ---
+      # --- 2) Setup Java ---
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: "17"
+          java-version: ${{ env.JAVA_VERSION }}
           distribution: "temurin"
+          cache: "maven"
 
-      # --- STEP 2: Cache SonarCloud packages ---
+      # --- 3) Cache SonarCloud packages ---
       - name: Cache SonarCloud packages
         uses: actions/cache@v4
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
-
-      # --- STEP 3: Cache Maven packages ---
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-maven-
+            ${{ runner.os }}-sonar
 
-      # --- STEP 4: Make mvnw executable ---
+      # --- 4) Make mvnw executable ---
       - name: Make mvnw executable
         run: chmod +x mvnw
 
-      # --- STEP 5: Build and Test ---
+      # --- 5) Build + Test + Coverage (JaCoCo runs in verify phase) ---
       - name: Build and Test with Maven
-        run: ./mvnw -B verify
+        run: ./mvnw -B clean verify
 
-      # --- STEP 6: SonarCloud Analysis (SAST) ---
+      # --- 6) SonarCloud Analysis (SAST) ---
       - name: Analyze with SonarCloud
-        if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./mvnw org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          ./mvnw -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.projectKey=zm24acgRiyan_Lean-DevSecOps \
             -Dsonar.organization=zm24acgriyan \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
 
-      # --- STEP 7: Verify Java Setup ---
-      - name: Verify Java Setup
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          java -version
-          ./mvnw -v
-
-      # --- STEP 8: Install Snyk CLI ---
+      # --- 7) Snyk Setup ---
       - name: Install Snyk CLI
-        if: success()
         uses: snyk/actions/setup@master
 
-      # --- STEP 9: Authenticate Snyk ---
-      - name: Authenticate Snyk
-        if: success()
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          snyk auth "$SNYK_TOKEN"
-          echo "Snyk authentication complete."
-
-      # --- STEP 10: Run Snyk SCA Scan ---
+      # --- 8) Run Snyk SCA (JSON + SARIF) ---
       - name: Run Snyk SCA
-        if: success()
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          echo "Running Snyk Test..."
-          snyk test --all-projects \
-                     --severity-threshold=high \
-                     --json-file-output=snyk.json \
-                     --sarif-file-output=snyk.sarif || true
+          echo "Running Snyk test..."
+          if [ "${ENFORCE_SECURITY}" = "true" ]; then
+            snyk test --all-projects \
+              --severity-threshold=high \
+              --json-file-output=snyk.json \
+              --sarif-file-output=snyk.sarif
+          else
+            snyk test --all-projects \
+              --severity-threshold=high \
+              --json-file-output=snyk.json \
+              --sarif-file-output=snyk.sarif || true
+          fi
 
-      # --- STEP 11: Upload Snyk artifact (JSON + SARIF) ---
+      # --- 9) Upload Snyk artifacts ---
       - name: Upload Snyk Scan Reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -108,31 +96,40 @@ jobs:
             snyk.json
             snyk.sarif
 
-      # --- STEP 12: Upload Snyk SARIF to GitHub Security ---
+      # --- 10) Upload Snyk SARIF to GitHub Security Tab ---
       - name: Upload Snyk SARIF to GitHub Security Tab
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: snyk.sarif
 
-      # --- STEP 13: Build Docker Image ---
+      # --- 11) Build Docker Image (tag with commit SHA for traceability) ---
       - name: Build Docker Image
-        run: docker build -t myapp:latest .
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
-      # --- STEP 14: Scan Docker Image with Trivy ---
+      # --- 12) Scan Docker Image with Trivy (SARIF) ---
       - name: Scan Docker Image with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.24.0
         with:
-          image-ref: myapp:latest
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy.sarif
-          exit-code: 0        # <-- Do not fail pipeline
           ignore-unfixed: true
+          exit-code: ${{ env.ENFORCE_SECURITY == 'true' && '1' || '0' }}
 
-      # --- STEP 15: Upload Trivy SARIF to GitHub Security Tab ---
+      # --- 13) Upload Trivy SARIF to GitHub Security Tab ---
       - name: Upload Trivy SARIF to GitHub Security Tab
         uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: trivy.sarif
+
+      # --- 14) Upload Trivy SARIF as artifact too ---
+      - name: Upload Trivy SARIF report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-sarif
+          path: trivy.sarif

@@ -1,9 +1,11 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
+  <!-- Spring Boot Parent -->
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
@@ -11,87 +13,127 @@
     <relativePath/>
   </parent>
 
+  <!-- Project Metadata -->
   <groupId>com.example</groupId>
   <artifactId>Lean-DevSecOps</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <name>Lean-DevSecOps</name>
-  <description>Lean DevSecOps Spring Boot Project for CI/CD and SonarCloud Integration</description>
+  <description>
+    Lean DevSecOps Spring Boot Project for CI/CD,
+    SonarCloud SAST, Snyk SCA, and Container Security Analysis
+  </description>
 
+  <!-- Properties -->
   <properties>
     <java.version>17</java.version>
     <jacoco.version>0.8.11</jacoco.version>
-    <main.class.path>com/example/LeanDevSecOpsApplication.class</main.class.path>
   </properties>
 
+  <!-- Dependencies -->
   <dependencies>
+
+    <!-- Spring Boot Web -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
+
+    <!-- Spring Boot Test -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
   </dependencies>
 
+  <!-- Build Configuration -->
   <build>
-    <!-- Force Maven to produce target/myapp.jar -->
+
+    <!-- Ensure consistent JAR name -->
     <finalName>myapp</finalName>
 
     <plugins>
+
       <!-- Spring Boot Plugin -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
 
-      <!-- Jacoco Plugin -->
+      <!-- JaCoCo Plugin: Coverage + Enforcement -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>${jacoco.version}</version>
+
         <executions>
+
+          <!-- Attach JaCoCo agent before tests -->
           <execution>
             <id>prepare-agent</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
           </execution>
+
+          <!-- Generate coverage report (XML + HTML) -->
           <execution>
             <id>report</id>
             <phase>verify</phase>
             <goals>
               <goal>report</goal>
             </goals>
+            <configuration>
+              <formats>
+                <format>XML</format>
+                <format>HTML</format>
+              </formats>
+              <excludes>
+                <!-- Exclude Spring Boot entrypoint -->
+                <exclude>**/LeanDevSecOpsApplication.*</exclude>
+              </excludes>
+            </configuration>
           </execution>
+
+          <!-- Enforce 80% Line Coverage -->
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <excludes>
+                <exclude>**/LeanDevSecOpsApplication.*</exclude>
+              </excludes>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+
         </executions>
-        <configuration>
-          <excludes>
-            <exclude>${main.class.path}</exclude>
-          </excludes>
-          <rules>
-            <rule>
-              <element>BUNDLE</element>
-              <limits>
-                <limit>
-                  <counter>LINE</counter>
-                  <value>COVEREDRATIO</value>
-                  <minimum>0.80</minimum> <!-- Enforce 80% line coverage -->
-                </limit>
-              </limits>
-            </rule>
-          </rules>
-        </configuration>
       </plugin>
 
-      <!-- SonarCloud Plugin -->
+      <!-- SonarCloud Maven Plugin (SAST) -->
       <plugin>
         <groupId>org.sonarsource.scanner.maven</groupId>
         <artifactId>sonar-maven-plugin</artifactId>
         <version>3.11.0.3922</version>
       </plugin>
+
     </plugins>
+
   </build>
 
 </project>
