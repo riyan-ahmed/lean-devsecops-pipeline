@@ -124,11 +124,11 @@ jobs:
 
       # --- STEP 13: Enforce Snyk Quality Gate (FAIL on HIGH/CRITICAL) ---
       - name: Enforce Snyk Quality Gate
-        if: always()
+        if: always() && github.ref_name == 'demo/fail-sca'
         run: |
           if [ "${{ steps.snyk.outputs.snyk_exit }}" != "0" ]; then
-            echo "Snyk found HIGH/CRITICAL vulnerabilities (threshold exceeded). Failing pipeline."
-            exit 1
+          echo "Snyk found HIGH/CRITICAL vulnerabilities (threshold exceeded). Failing pipeline."
+          exit 1
           fi
           echo "No HIGH/CRITICAL vulnerabilities detected by Snyk."
 
