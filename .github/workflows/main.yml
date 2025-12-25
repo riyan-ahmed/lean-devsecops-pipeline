@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: read
-  security-events: write   # Needed to upload SARIF to GitHub
+  security-events: write
 
 jobs:
   build-and-analyze:
@@ -87,17 +87,23 @@ jobs:
           snyk auth "$SNYK_TOKEN"
           echo "Snyk authentication complete."
 
- # --- STEP 10: Run Snyk SCA Scan ---
-      - name: Run Snyk SCA
+      # --- STEP 10: Run Snyk SCA (capture exit + generate reports) ---
+      - name: Run Snyk SCA (JSON + SARIF)
+        id: snyk
         if: success()
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          set +e
           echo "Running Snyk Test (JSON)..."
-          snyk test --all-projects --severity-threshold=high --json > snyk.json || true
-          
+          snyk test --all-projects --severity-threshold=high --json > snyk.json
+          SNYK_EXIT=$?
+
           echo "Running Snyk Test (SARIF)..."
-          snyk test --all-projects --severity-threshold=high --sarif > snyk.sarif || true
+          snyk test --all-projects --severity-threshold=high --sarif > snyk.sarif
+
+          echo "snyk_exit=$SNYK_EXIT" >> $GITHUB_OUTPUT
+          exit 0
 
       # --- STEP 11: Upload Snyk artifact (JSON + SARIF) ---
       - name: Upload Snyk Scan Reports
@@ -116,11 +122,21 @@ jobs:
         with:
           sarif_file: snyk.sarif
 
-      # --- STEP 13: Build Docker Image ---
+      # --- STEP 13: Enforce Snyk Quality Gate (FAIL on HIGH/CRITICAL) ---
+      - name: Enforce Snyk Quality Gate
+        if: always()
+        run: |
+          if [ "${{ steps.snyk.outputs.snyk_exit }}" != "0" ]; then
+            echo "Snyk found HIGH/CRITICAL vulnerabilities (threshold exceeded). Failing pipeline."
+            exit 1
+          fi
+          echo "No HIGH/CRITICAL vulnerabilities detected by Snyk."
+
+      # --- STEP 14: Build Docker Image ---
       - name: Build Docker Image
         run: docker build -t myapp:latest .
 
-      # --- STEP 14: Scan Docker Image with Trivy ---
+      # --- STEP 15: Scan Docker Image with Trivy ---
       - name: Scan Docker Image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
@@ -128,10 +144,10 @@ jobs:
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy.sarif
-          exit-code: 0        # <-- Do not fail pipeline
+          exit-code: 0
           ignore-unfixed: true
 
-      # --- STEP 15: Upload Trivy SARIF to GitHub Security Tab ---
+      # --- STEP 16: Upload Trivy SARIF to GitHub Security Tab ---
       - name: Upload Trivy SARIF to GitHub Security Tab
         uses: github/codeql-action/upload-sarif@v4
         if: always()
