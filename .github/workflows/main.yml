@@ -1,10 +1,11 @@
-name: Java CI with Maven (SAST + Snyk SCA + Docker Scan)
-
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - demo/final
+      - demo/*
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - demo/final
 
 permissions:
   contents: read
