@@ -9,7 +9,7 @@ It provides a practical, empirical case study of "Shift-Left" security by integr
 ## 🎯 Objectives
 - Measure the **cost** (pipeline runtime overhead) of adding security gates.
 - Evaluate the **benefit** (ability to detect and block vulnerabilities).
-- Provide analytical conclusions on tool reliability, performance trade-offs, and enforcement policies.
+- Provide analytical conclusions on tool reliability, performance trade-offs, and enforcement policies. 
 
 ---
 
