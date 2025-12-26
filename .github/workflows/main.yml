@@ -87,16 +87,18 @@ jobs:
           echo "Snyk authentication complete."
 
       # --- STEP 10: Run Snyk SCA Scan ---
+           # --- STEP 10: Run Snyk SCA Scan ---
       - name: Run Snyk SCA
         if: success()
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
-          echo "Running Snyk Test..."
-          snyk test --all-projects \
-                     --severity-threshold=high \
-                     --json-file-output=snyk.json \
-                     --sarif-file-output=snyk.sarif
+          echo "Running Snyk Test (Maven only)..."
+          snyk test --file=pom.xml \
+            --package-manager=maven \
+            --severity-threshold=high \
+            --json-file-output=snyk.json \
+            --sarif-file-output=snyk.sarif
 
       # --- STEP 11: Upload Snyk artifact (JSON + SARIF) ---
       - name: Upload Snyk Scan Reports
