@@ -96,7 +96,7 @@ jobs:
           snyk test --all-projects \
                      --severity-threshold=high \
                      --json-file-output=snyk.json \
-                     --sarif-file-output=snyk.sarif || true
+                     --sarif-file-output=snyk.sarif
 
       # --- STEP 11: Upload Snyk artifact (JSON + SARIF) ---
       - name: Upload Snyk Scan Reports
