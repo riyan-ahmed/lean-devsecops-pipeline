@@ -14,7 +14,7 @@ It provides a practical, empirical case study of "Shift-Left" security by integr
 ---
 
 ## 🛠️ Technical Stack
-- **Language/Framework**: Java (Spring Boot)
+- **Language/Framework**: Java (Spring Boot) 
 - **Build Tool**: Maven
 - **Version Control & CI/CD**: GitHub Actions
 - **Security Tools**:
