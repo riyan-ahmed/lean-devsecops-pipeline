@@ -26,7 +26,7 @@ It provides a practical, empirical case study of "Shift-Left" security by integr
 
 ## 📊 Experimental Phases
 
-### Phase 1: Baseline Pipeline
+### Phase 1: Baseline Pipeline 
 - Built a clean CI/CD pipeline for Spring Boot.
 - **Baseline runtime**: 43 seconds.
 
