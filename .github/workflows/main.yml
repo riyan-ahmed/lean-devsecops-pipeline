@@ -127,7 +127,7 @@ jobs:
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy.sarif
-          exit-code: 0        # <-- Do not fail pipeline
+          exit-code: 1        # <-- Do not fail pipeline
           ignore-unfixed: true
 
       # --- STEP 15: Upload Trivy SARIF to GitHub Security Tab ---
