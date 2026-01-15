@@ -1,4 +1,4 @@
-# DevSecOps Investigation Journey: An Analytical Case Study of "Shift-Left" Security
+# DevSecOps Investigation Journey: An Analytical Case Study of Shift-Left Security in a Java CI/CD Pipeline.
 
 ## 📖 Project Overview
 This project investigates the trade-offs of **DevSecOps** practices, focusing on the balance between **performance overhead** and **security efficacy** in CI/CD pipelines.  
