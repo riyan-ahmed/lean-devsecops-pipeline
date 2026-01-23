@@ -1,60 +1,122 @@
-# DevSecOps Investigation Journey: An Analytical Case Study of "Shift-Left" Security
+🚀 Lean DevSecOps CI/CD Pipeline
 
-## 📖 Project Overview
-This project investigates the trade-offs of **DevSecOps** practices, focusing on the balance between **performance overhead** and **security efficacy** in CI/CD pipelines.  
-It provides a practical, empirical case study of "Shift-Left" security by integrating static analysis (SAST) and software composition analysis (SCA) tools into a Spring Boot pipeline.
+Shift-Left Security in a Java-Based CI/CD Workflow
 
----
+📌 Overview
 
-## 🎯 Objectives
-- Measure the **cost** (pipeline runtime overhead) of adding security gates.
-- Evaluate the **benefit** (ability to detect and block vulnerabilities).
-- Provide analytical conclusions on tool reliability, performance trade-offs, and enforcement policies.
+This project demonstrates a Lean DevSecOps CI/CD pipeline that integrates shift-left security into the software delivery lifecycle using industry-standard open-source tools.
 
----
+The goal is not just automation, but to evaluate real-world trade-offs between security coverage and pipeline performance by embedding security checks early and enforcing them pragmatically.
 
-## 🛠️ Technical Stack
-- **Language/Framework**: Java (Spring Boot)
-- **Build Tool**: Maven
-- **Version Control & CI/CD**: GitHub Actions
-- **Security Tools**:
-  - SonarQube / SonarCloud (SAST)
-  - Snyk (SCA)
-  - OWASP Dependency-Check (attempted, failed)
+🧠 Problem Statement
 
----
+Traditional CI/CD pipelines often treat security as a late-stage activity, which:
 
-## 📊 Experimental Phases
+Allows vulnerable code and dependencies to reach production
 
-### Phase 1: Baseline Pipeline
-- Built a clean CI/CD pipeline for Spring Boot.
-- **Baseline runtime**: 43 seconds.
+Increases remediation cost
 
-### Phase 2: Performance Experimentation (Cost)
-- **SonarQube (SAST)**: +14s overhead (total 57s).
-- **OWASP Dependency-Check (SCA)**: Failed due to NVD API errors.
-- **Snyk (SCA)**: +26s overhead (total 1m 23s). Reliable and fast compared to OWASP.
+Slows down delivery when issues are found late
 
-### Phase 3: Efficacy Experimentation (Benefit)
-- **SCA Test**: Injected `log4j-core@2.14.1` (Log4Shell vulnerability).  
-  → Build failed as expected (`--fail-on=high` policy enforced).
-- **SAST Test**: Planted SQL Injection + Hardcoded Password.  
-  → SonarCloud flagged issues, Quality Gate failed.
+This project addresses that gap by embedding security directly into the CI pipeline.
 
-### Phase 4: Fix Cycle (Pass)
-- Removed vulnerable dependency (Log4j).  
-- Reviewed and remediated SonarCloud hotspots.  
-- Corrected compilation/package issues.  
-- Final pipeline: **Green ✅**, Quality Gate: **Passed**.
+🏗️ Architecture Overview
 
----
+Pipeline Flow:
 
-## 📌 Key Findings
-- **Tool Reliability Matters**: OWASP Dependency-Check proved unstable; Snyk provided consistent results.  
-- **Performance Overhead is Acceptable**: ~40s increase justified by catching critical vulnerabilities.  
-- **Policy Enforcement is Essential**: Scanners must enforce fail-on policies to block insecure deployments.  
-- **Full Cycle Achieved**: Find → Fail → Fix → Pass.
+Code pushed to GitHub
 
----
+CI triggered via GitHub Actions
 
-## 📂 Repository Structure
+Build & test Java application
+
+Static Application Security Testing (SAST)
+
+Software Composition Analysis (SCA)
+
+Docker image build
+
+Container image security scanning
+
+Centralised security reporting
+
+The pipeline runs on every push and pull request to ensure continuous security validation.
+
+🔐 Security Layers Implemented
+Layer	Tool	Purpose
+Source Code	SonarCloud	Detect insecure coding patterns (SAST)
+Dependencies	Snyk	Identify vulnerable third-party libraries (SCA)
+Container Image	Trivy	Scan OS & runtime vulnerabilities
+Reporting	GitHub Code Scanning	Centralised vulnerability visibility
+⚙️ Tech Stack
+
+CI/CD: GitHub Actions
+
+Language: Java (Spring Boot, Maven)
+
+Security: SonarCloud, Snyk, Trivy
+
+Containerisation: Docker
+
+Security Reporting: SARIF + GitHub Security Dashboard
+
+🧪 Key Features
+
+✅ Automated build and test execution
+
+✅ Shift-left security with layered scanning
+
+✅ Risk-based enforcement (blocking only high-severity findings)
+
+✅ Centralised vulnerability reporting
+
+✅ Docker-based environment consistency
+
+✅ Reproducible CI/CD workflows
+
+📊 Key Learnings & Trade-Offs
+
+Most critical vulnerabilities originated from dependencies and container images, not application code
+
+Security automation increased pipeline runtime but remained operationally acceptable
+
+Selective enforcement provided the best balance between security and delivery speed
+
+Shift-left security significantly improved visibility without blocking developer productivity
+
+📁 Repository Structure
+.
+├── .github/workflows/        # GitHub Actions CI/CD pipeline
+├── src/                      # Java Spring Boot application
+├── Dockerfile                # Container build definition
+├── pom.xml                   # Maven dependencies & plugins
+└── README.md
+
+🔗 Related Resources
+
+CI/CD pipeline definitions: .github/workflows
+
+Security reports: GitHub → Security → Code scanning
+
+Academic case study: MSc Advanced Computer Science Final Project
+
+🎯 Why This Project Matters
+
+This project reflects real DevSecOps practices, not just tooling:
+
+Practical CI/CD design
+
+Security embedded early, not bolted on
+
+Balanced enforcement strategy
+
+Industry-aligned tools and workflows
+
+📬 Contact
+
+If you’d like to discuss DevSecOps, CI/CD security, or this project:
+
+Riyan Ahmed
+GitHub: https://github.com/riyan-ahmed
+
+LinkedIn: https://www.linkedin.com/in/riyan-ahmed-devops
