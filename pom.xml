@@ -22,7 +22,7 @@
     <logback.version>1.5.36</logback.version>
     <jackson-bom.version>2.21.5</jackson-bom.version>
     <tomcat.version>10.1.56</tomcat.version>
-    <jacoco.version>0.8.11</jacoco.version>
+    <jacoco.version>0.8.15</jacoco.version>
     <main.class.path>com/example/LeanDevSecOpsApplication.class</main.class.path>
   </properties>
 
