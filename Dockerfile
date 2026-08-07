@@ -1,5 +1,5 @@
 # Build stage
-FROM eclipse-temurin:17-jdk-jammy AS build
+FROM eclipse-temurin:25-jdk-jammy AS build
 
 WORKDIR /workspace
 
@@ -14,7 +14,7 @@ COPY src/ src/
 RUN ./mvnw -B clean package
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:25-jre-jammy
 
 WORKDIR /app
 
