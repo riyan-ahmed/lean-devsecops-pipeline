@@ -4,7 +4,7 @@
 
 **Shift-left application and container security using GitHub Actions, Maven, SonarCloud, Snyk, Trivy and Docker.**
 
-An MSc Advanced Computer Science case study and portfolio project that explores the practical trade-offs between vulnerability detection, CI/CD speed and security enforcement. This repository demonstrates **continuous integration and security scanning**, not deployment to a production environment.
+A **University of Hertfordshire DevSecOps research implementation**, developed through my university research work in the Research Assistant – DevSecOps & Cloud Security context and connected to my MSc Advanced Computer Science studies. It investigates the trade-offs between vulnerability detection, CI/CD speed and security enforcement. The repository demonstrates **continuous integration and security scanning**, not deployment to a production environment.
 
 [View the workflow](.github/workflows/main.yml) · [Successful end-to-end run, 10 August 2026](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/runs/31427793541) · [Dockerfile](Dockerfile)
 
@@ -146,13 +146,13 @@ SECURITY.md
 README.md
 ```
 
-## Academic context
+## University research context
 
-This repository supports the MSc Advanced Computer Science final project:
+This repository documents **DevSecOps and cloud security research work undertaken at the University of Hertfordshire** as part of my Research Assistant experience, and is connected with my MSc Advanced Computer Science final project:
 
 **“An Analytical Case Study of Shift-Left Security: Evaluating the Practical Trade-Offs of Integrating Open-Source Security Tools into a Java CI/CD Pipeline.”**
 
-Work performed in a separate employment role should be described and substantiated independently.
+The implementation explores shift-left scanning, vulnerability remediation, SARIF reporting and security enforcement in CI/CD. The repository provides technical evidence for the features documented here; wider Research Assistant responsibilities should be supported by their own evidence.
 
 ---
 
