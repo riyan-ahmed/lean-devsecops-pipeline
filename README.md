@@ -1,262 +1,159 @@
 # 🚀 Lean DevSecOps CI/CD Pipeline
 
-[![Security Pipeline](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/workflows/main.yml/badge.svg)](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/workflows/main.yml)
+[![Security Pipeline](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/workflows/main.yml)
 
-## Shift-Left Security in a Java CI/CD Workflow
+**Shift-left application and container security using GitHub Actions, Maven, SonarCloud, Snyk, Trivy and Docker.**
 
-A Java-based DevSecOps pipeline that integrates automated security testing into the software delivery lifecycle using GitHub Actions, SonarCloud, Snyk, Trivy and Docker.
+A **University of Hertfordshire DevSecOps research implementation**, developed through my university research work in the Research Assistant – DevSecOps & Cloud Security context and connected to my MSc Advanced Computer Science studies. It investigates the trade-offs between vulnerability detection, CI/CD speed and security enforcement. The repository demonstrates **continuous integration and security scanning**, not deployment to a production environment.
 
----
+[View the workflow](.github/workflows/main.yml) · [Successful end-to-end run, 10 August 2026](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/runs/31427793541) · [Dockerfile](Dockerfile)
 
-## 📌 Overview
+## What it does
 
-This project demonstrates how shift-left security can be embedded directly into a CI/CD pipeline.
+- **Build and test:** Maven builds and tests the Java/Spring Boot application.
+- **SAST and quality gate:** SonarCloud analyses code and evaluates its quality gate.
+- **Dependency security:** Snyk scans application dependencies and generates JSON and SARIF reports.
+- **Container security:** Trivy scans the Docker image for high and critical findings.
+- **Security visibility:** Snyk and Trivy SARIF files are uploaded to **GitHub Code Scanning** under separate categories.
+- **Security enforcement:** GitHub Actions evaluates Snyk and Trivy outcomes after report uploads and fails the job when a scan fails.
+- **Image hardening:** A multi-stage Dockerfile uses a JRE runtime, non-root execution and a health check.
 
-The objective is not only to automate builds and security scans, but also to evaluate the practical trade-offs between:
-
-- Security coverage
-- Pipeline performance
-- Vulnerability enforcement
-- Developer productivity
-
-The pipeline automatically builds, tests and scans the application whenever code is pushed or a pull request is created.
-
----
-
-## 🧠 Problem Statement
-
-Traditional CI/CD pipelines often treat security as a late-stage activity. This can:
-
-- Allow vulnerable code and dependencies to progress through the delivery process
-- Increase the cost of remediation
-- Delay releases when vulnerabilities are discovered late
-- Reduce visibility into software supply-chain risks
-
-This project addresses that problem by embedding security checks directly into the CI workflow.
-
----
-
-## 🏗️ Pipeline Architecture
+## Pipeline architecture
 
 ```mermaid
-flowchart LR
-    A[Git Push or Pull Request] --> B[Build and Unit Tests]
-    B --> C[SonarCloud SAST]
-    C --> D[Snyk Dependency Scan]
-    D --> E[Docker Image Build]
-    E --> F[Trivy Container Scan]
-    F --> G[Upload SARIF Reports]
-    G --> H{Security Gate}
-    H -->|Pass| I[Pipeline Successful]
-    H -->|Fail| J[Build Blocked]
+flowchart TD
+    A[Push / pull request / manual run] --> B[Maven build and tests]
+    B --> C[SonarCloud analysis and quality gate]
+    C --> D[Snyk dependency scan]
+    D --> E[Docker image build]
+    E --> F[Trivy image scan]
+    D --> G[Snyk SARIF]
+    F --> H[Trivy SARIF]
+    G --> I[GitHub Code Scanning]
+    H --> I
+    D --> J{Final security gate}
+    F --> J
+    J -->|Pass| K[CI success]
+    J -->|Fail| L[CI failure]
 ```
 
-### Pipeline flow
+The implementation is **one GitHub Actions job with multiple steps**, rather than separate deployment pipelines.
 
-1. Code is pushed to GitHub
-2. GitHub Actions starts the workflow
-3. Maven builds and tests the application
-4. SonarCloud performs static code analysis
-5. Snyk scans third-party dependencies
-6. Docker builds the application image
-7. Trivy scans the container image
-8. SARIF reports are uploaded to GitHub Code Scanning
-9. The pipeline blocks high and critical security findings
+## Tooling and reporting
 
-The workflow runs on:
+| Area | Technology | Implementation |
+| --- | --- | --- |
+| CI | GitHub Actions | Push to `main`, pull requests to `main`, and manual runs |
+| Build and tests | Maven, JUnit | `./mvnw -B clean verify` |
+| Code analysis | SonarCloud | Static analysis and quality-gate wait |
+| Dependency scan | Snyk | High-severity threshold; JSON and SARIF reports |
+| Image scan | Trivy | HIGH/CRITICAL image scanning; SARIF report |
+| Reporting | GitHub Code Scanning | SARIF uploads from **Snyk and Trivy** |
+| Maintenance | Dependabot | Weekly Maven, Docker and Actions dependency checks |
 
-- Pushes to `main`
-- Pull requests targeting `main`
-- Manual workflow execution
+**Reporting accuracy:** SonarCloud has its own reporting and quality gate. Only Snyk and Trivy are configured to upload SARIF in this repository. **OWASP ZAP is not part of the current workflow.**
 
----
+### Security gate behaviour
 
-## 🔐 Security Layers
+The workflow uploads available Snyk and Trivy reports before checking their results. It fails if either scanner fails. SonarCloud is checked earlier, so a SonarCloud failure can stop subsequent standard steps.
 
-| Security layer | Tool | Purpose |
-|---|---|---|
-| Source code | SonarCloud | Detects bugs, vulnerabilities and insecure coding patterns |
-| Dependencies | Snyk | Identifies vulnerable direct and transitive dependencies |
-| Container image | Trivy | Scans application libraries and operating-system packages |
-| Quality gate | SonarCloud | Blocks the pipeline when quality requirements are not met |
-| Security gate | GitHub Actions | Blocks high and critical Snyk or Trivy findings |
-| Reporting | GitHub Code Scanning | Provides centralised SARIF-based security visibility |
+Trivy has `ignore-unfixed: true` enabled, so vulnerabilities without available fixes are excluded from its blocking scan. Passing the workflow means its configured checks passed on that run; it is **not** a guarantee that no vulnerabilities exist.
 
----
+## Vulnerability remediation
 
-## ⚙️ Technology Stack
+Dependency and container scans identified vulnerabilities during development. The project's recorded remediation examples include:
 
-- **CI/CD:** GitHub Actions
-- **Application:** Java and Spring Boot
-- **Build tool:** Maven
-- **Static analysis:** SonarCloud
-- **Dependency scanning:** Snyk
-- **Container scanning:** Trivy
-- **Containerisation:** Docker
-- **Reporting:** SARIF and GitHub Code Scanning
+| Dependency family | Earlier version(s) | Patched version |
+| --- | --- | --- |
+| Spring Boot | 3.3.0 | 3.5.15 |
+| Spring Framework | 6.1.8 | 6.2.19 |
+| Logback | 1.5.6 / 1.5.34 | 1.5.36 |
+| Jackson | 2.17.1 / 2.21.4 | 2.21.5 |
+| Apache Tomcat | 10.1.24 / 10.1.55 | 10.1.56 |
+| Micrometer | 1.13.0 | 1.15.12 |
 
----
+These are **six dependency families**, not six separately deployed application components. Review [`pom.xml`](pom.xml) and the commit history for the source configuration.
 
-## 🧪 Key Features
+The [10 August 2026 run](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/runs/31427793541) successfully completed the build, tests, SonarCloud analysis, Snyk and Trivy scans, SARIF uploads and final security gate. Later Dependabot pull-request runs have experienced build compatibility and SonarCloud authorisation errors. A previously successful run should not be presented as proof that every future run succeeds.
 
-- ✅ Automated Maven build and unit testing
-- ✅ SonarCloud static application security testing
-- ✅ SonarCloud Quality Gate enforcement
-- ✅ Snyk software composition analysis
-- ✅ Docker multi-stage build
-- ✅ Non-root container execution
-- ✅ Container health checks
-- ✅ Trivy container vulnerability scanning
-- ✅ SARIF report uploads to GitHub Security
-- ✅ High and critical vulnerability enforcement
-- ✅ Reproducible and manually executable workflows
+## Container security
 
----
+The [Dockerfile](Dockerfile) implements a multi-stage JDK build and JRE runtime image, executes the application as a non-root `spring` user and includes a Docker health check targeting the Spring Boot Actuator endpoint.
 
-## 🛡️ Vulnerability Detection and Remediation
+This repository demonstrates **one application Docker image**. It does not independently establish that four or more distinct images were hardened.
 
-The security gates initially blocked the pipeline after Snyk and Trivy detected vulnerable libraries in the application dependency tree and packaged Docker image.
+## Run locally
 
-### Remediation completed
+Prerequisites: Java 17+, Git and Docker.
 
-| Component | Previous version | Patched version |
-|---|---:|---:|
-| Spring Boot | `3.3.0` | `3.5.15` |
-| Spring Framework | `6.1.8` | `6.2.19` |
-| Logback | `1.5.6` / `1.5.34` | `1.5.36` |
-| Jackson | `2.17.1` / `2.21.4` | `2.21.5` |
-| Apache Tomcat | `10.1.24` / `10.1.55` | `10.1.56` |
-| Micrometer | `1.13.0` | `1.15.12` |
-
-After remediation, the complete pipeline passed successfully with no remaining high or critical findings.
-
-This demonstrates the full DevSecOps feedback cycle:
-
-> **Detect → Block → Remediate → Verify**
-
----
-
-## 📊 Key Learnings and Trade-Offs
-
-### Dependency risk
-
-Most blocking vulnerabilities originated from transitive dependencies packaged inside the application rather than from custom application code.
-
-### Security versus speed
-
-Security scanning increased the total pipeline runtime, but the additional execution time remained acceptable for continuous integration.
-
-### Reporting versus enforcement
-
-Generating a report alone does not prevent insecure software from progressing. Snyk and Trivy were therefore configured to upload reports before enforcing the final security gate.
-
-### Risk-based enforcement
-
-The pipeline blocks high and critical findings while still reporting lower-severity issues for review. This provides a practical balance between security and delivery speed.
-
-### Continuous maintenance
-
-A green pipeline is not permanently secure. New vulnerabilities may be disclosed after dependencies have already been released, making continuous scanning and dependency updates essential.
-
----
-
-## 📁 Repository Structure
-
-```text
-.
-├── .github/
-│   └── workflows/
-│       └── main.yml
-├── src/
-│   ├── main/
-│   └── test/
-├── .mvn/
-├── Dockerfile
-├── mvnw
-├── mvnw.cmd
-├── pom.xml
-└── README.md
-```
-
----
-
-## ▶️ Run Locally
-
-### Prerequisites
-
-- Java 17 or later
-- Docker
-- Git
-
-### Build and test
+Build and test:
 
 ```bash
 ./mvnw clean verify
 ```
 
-### Build the Docker image
+Build and run the container:
 
 ```bash
 docker build -t lean-devsecops-pipeline:local .
-```
-
-### Run the container
-
-```bash
 docker run --rm -p 8081:8080 lean-devsecops-pipeline:local
 ```
 
-### Check application health
+Check its health in another terminal:
 
 ```bash
 curl http://localhost:8081/actuator/health
 ```
 
-Expected response:
+Expected healthy response:
 
 ```json
 {"status":"UP"}
 ```
 
----
+The full workflow requires GitHub Actions plus the configured SonarCloud and Snyk authentication secrets.
 
-## 🔎 Security Reports
+## Evidence and results
 
-Security results are available in:
+| Evidence | Location |
+| --- | --- |
+| CI history, step logs and scan artifacts | [GitHub Actions](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/workflows/main.yml) |
+| Verified successful run | [10 August 2026 workflow execution](https://github.com/riyan-ahmed/lean-devsecops-pipeline/actions/runs/31427793541) |
+| Snyk and Trivy findings | [GitHub Code Scanning](https://github.com/riyan-ahmed/lean-devsecops-pipeline/security/code-scanning) |
+| Dependency configuration | [`pom.xml`](pom.xml) |
+| Container hardening | [`Dockerfile`](Dockerfile) |
+| Responsible disclosure | [`SECURITY.md`](SECURITY.md) |
 
-- **GitHub Actions:** workflow execution logs and downloadable artifacts
-- **GitHub Security:** Code scanning alerts uploaded using SARIF
-- **SonarCloud:** static analysis and Quality Gate results
-- **Snyk:** dependency vulnerability results
-- **Trivy:** container image vulnerability results
+## Design decisions and limitations
 
----
+- **Report before enforcing:** Preserve scan outputs even when scans return non-zero results.
+- **Prioritise severe findings:** Security checks target high and critical vulnerabilities, not every lower-severity issue.
+- **Maintain dependencies:** Dependabot proposes updates to Maven, Actions and Docker dependencies.
+- **Avoid overstating scope:** This is a CI/security demonstration, without Kubernetes or AWS deployment, production uptime metrics or a DAST stage.
+- **Treat scanning as continuous:** Findings change as dependencies and vulnerability databases are updated.
 
-## 🎓 Academic Context
+## Repository structure
 
-This repository supports the MSc Advanced Computer Science final project:
+```text
+.github/
+  workflows/main.yml
+  dependabot.yml
+src/main/
+src/test/
+Dockerfile
+pom.xml
+SECURITY.md
+README.md
+```
+
+## University research context
+
+This repository documents **DevSecOps and cloud security research work undertaken at the University of Hertfordshire** as part of my Research Assistant experience, and is connected with my MSc Advanced Computer Science final project:
 
 **“An Analytical Case Study of Shift-Left Security: Evaluating the Practical Trade-Offs of Integrating Open-Source Security Tools into a Java CI/CD Pipeline.”**
 
----
-
-## 🎯 Why This Project Matters
-
-This project demonstrates more than individual security tools. It shows:
-
-- Practical CI/CD pipeline design
-- Security embedded early in development
-- Layered application and container scanning
-- Automated vulnerability enforcement
-- Evidence-based dependency remediation
-- Centralised security reporting
-- A realistic balance between security and delivery speed
+The implementation explores shift-left scanning, vulnerability remediation, SARIF reporting and security enforcement in CI/CD. The repository provides technical evidence for the features documented here; wider Research Assistant responsibilities should be supported by their own evidence.
 
 ---
 
-## 📬 Contact
-
-**Riyan Ahmed**
-
-- [GitHub](https://github.com/riyan-ahmed)
-- [LinkedIn](https://www.linkedin.com/in/riyan-ahmed-devops)
+**Maintainer:** [Riyan Ahmed](https://github.com/riyan-ahmed) · [LinkedIn](https://www.linkedin.com/in/riyan-ahmed-devops/)
