@@ -5,6 +5,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Spring Boot majors are migrations (Boot 3 -> 4 needed Jackson 3, new test
+      # modules and removal of our old version pins). Upgrade deliberately, not
+      # via bot. Minor and patch updates (security fixes) still come through.
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -15,4 +21,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Temurin major versions are Java releases. Non-LTS ones (e.g. 22) are
+      # short-lived, and the app targets Java 17. Move between LTS versions
+      # (17 -> 21 -> 25) manually after testing.
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
