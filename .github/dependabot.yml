@@ -5,6 +5,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Spring Boot 4 is a major migration (Jackson 3 / tools.jackson, new
+      # module layout). Our jackson-bom.version override does not resolve
+      # under Boot 4, so the build fails. Upgrade deliberately, not via bot.
+      - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -15,4 +21,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Temurin major versions are Java releases. Non-LTS ones (e.g. 22) are
+      # short-lived, and the app targets Java 17. Move between LTS versions
+      # (17 -> 21 -> 25) manually after testing.
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
 
