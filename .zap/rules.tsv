@@ -1,0 +1,3 @@
+# OWASP ZAP baseline rules (TSV: <rule id>\t<IGNORE|WARN|FAIL>\t<description>)
+# Intentionally empty for the first run: the first real report is reviewed
+# before any rule is marked FAIL or IGNORE.
