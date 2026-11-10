@@ -19,6 +19,8 @@
 
   <properties>
     <java.version>17</java.version>
+    <!-- Jackson 3 (tools.jackson) CVE fix ahead of the Boot-managed 3.1.7. Remove when Boot manages >= 3.1.8. -->
+    <jackson-bom.version>3.1.8</jackson-bom.version>
     <jacoco.version>0.8.11</jacoco.version>
     <main.class.path>com/example/LeanDevSecOpsApplication.class</main.class.path>
   </properties>
