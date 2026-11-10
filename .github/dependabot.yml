@@ -6,9 +6,9 @@ updates:
     schedule:
       interval: "weekly"
     ignore:
-      # Spring Boot 4 is a major migration (Jackson 3 / tools.jackson, new
-      # module layout). Our jackson-bom.version override does not resolve
-      # under Boot 4, so the build fails. Upgrade deliberately, not via bot.
+      # Spring Boot majors are migrations (Boot 3 -> 4 needed Jackson 3, new test
+      # modules and removal of our old version pins). Upgrade deliberately, not
+      # via bot. Minor and patch updates (security fixes) still come through.
       - dependency-name: "org.springframework.boot:spring-boot-starter-parent"
         update-types: ["version-update:semver-major"]
 
