@@ -7,25 +7,32 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# A new push to the same branch/PR cancels the older, now-pointless run.
 concurrency:
-  group: lean-devsecops-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Default is read-only. Jobs that need more ask for it explicitly below.
 permissions:
   contents: read
-  security-events: write
+
+env:
+  IMAGE_NAME: lean-devsecops-pipeline
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-  build-and-analyze:
-    name: Build, Test and Security Scan
+  # ---------------------------------------------------------------------------
+  # Stage 1: Build and unit tests
+  # ---------------------------------------------------------------------------
+  build-test:
+    name: "1 - Build and test (Maven)"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - name: Checkout source code
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -34,7 +41,71 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Build and test application
+        run: |
+          chmod +x mvnw
+          ./mvnw -B clean verify
+
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-and-coverage-reports
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Stage 2: SAST - SonarCloud
+  # ---------------------------------------------------------------------------
+  sast-sonarcloud:
+    name: "2 - SAST (SonarCloud)"
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read # lets Sonar decorate pull requests
+    steps:
+      # Dependabot PRs cannot read normal Actions secrets (GitHub design), so
+      # SONAR_TOKEN is empty there. For Dependabot ONLY we skip with a visible
+      # notice. For every other actor a missing token is a hard failure, so the
+      # gate can never be silently bypassed.
+      - name: Check SonarCloud token
+        id: preflight
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [[ -n "$SONAR_TOKEN" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$ACTOR" == "dependabot[bot]" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            msg="SonarCloud SKIPPED: Dependabot runs cannot read Actions secrets. Add SONAR_TOKEN under Settings > Secrets and variables > Dependabot to enable it here."
+            echo "::notice title=SonarCloud skipped::$msg"
+            echo "### :warning: $msg" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error title=SONAR_TOKEN missing::SONAR_TOKEN is empty. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Checkout source code
+        if: steps.preflight.outputs.run == 'true'
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Sonar needs full history for blame and new-code detection
+
+      - name: Set up JDK 21
+        if: steps.preflight.outputs.run == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
       - name: Cache SonarCloud packages
+        if: steps.preflight.outputs.run == 'true'
         uses: actions/cache@v5
         with:
           path: ~/.sonar/cache
@@ -42,44 +113,91 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sonar-
 
-      - name: Make Maven Wrapper executable
-        run: chmod +x mvnw
-
-      - name: Build and test application
-        run: ./mvnw -B clean verify
-
+      # Fails the job if the SonarCloud Quality Gate fails (qualitygate.wait).
       - name: Analyze with SonarCloud
+        if: steps.preflight.outputs.run == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          ./mvnw -B org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          chmod +x mvnw
+          ./mvnw -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.projectKey=zm24acgRiyan_Lean-DevSecOps \
             -Dsonar.organization=zm24acgriyan \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
             -Dsonar.qualitygate.wait=true
 
+  # ---------------------------------------------------------------------------
+  # Stage 3: SCA - Snyk dependency scan
+  # ---------------------------------------------------------------------------
+  sca-snyk:
+    name: "3 - SCA (Snyk)"
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # required by upload-sarif
+    steps:
+      - name: Check Snyk token
+        id: preflight
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [[ -n "$SNYK_TOKEN" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$ACTOR" == "dependabot[bot]" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            msg="Snyk SKIPPED: Dependabot runs cannot read Actions secrets. Add SNYK_TOKEN under Settings > Secrets and variables > Dependabot to enable it here."
+            echo "::notice title=Snyk skipped::$msg"
+            echo "### :warning: $msg" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error title=SNYK_TOKEN missing::SNYK_TOKEN is empty. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Checkout source code
+        if: steps.preflight.outputs.run == 'true'
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        if: steps.preflight.outputs.run == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
       - name: Set up Node.js for Snyk
+        if: steps.preflight.outputs.run == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: "24"
           package-manager-cache: false
 
       - name: Install Snyk CLI
+        if: steps.preflight.outputs.run == 'true'
         run: npm install --global snyk@1.1306.2
 
+      # Run the scan but record its exit code instead of failing immediately, so
+      # the SARIF/report uploads below always happen. The "Enforce Snyk gate"
+      # step at the end fails the job on any finding or scan error.
       - name: Run Snyk dependency scan
         id: snyk_scan
-        continue-on-error: true
+        if: steps.preflight.outputs.run == 'true'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          chmod +x mvnw
           snyk --version
+          set +e
           snyk test --all-projects \
             --severity-threshold=high \
             --json-file-output=snyk.json \
             --sarif-file-output=snyk.sarif
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
 
       - name: Upload Snyk reports
         if: always() && hashFiles('snyk.json', 'snyk.sarif') != ''
@@ -89,33 +207,100 @@ jobs:
           path: |
             snyk.json
             snyk.sarif
-          if-no-files-found: warn
 
-      - name: Upload Snyk results to GitHub Security
+      - name: Upload Snyk results to GitHub Code Scanning
         if: always() && hashFiles('snyk.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: snyk.sarif
           category: snyk-sca
 
-      - name: Build Docker image
+      # Snyk exit codes: 0 = clean, 1 = vulnerabilities at/above threshold,
+      # 2/3 = scanner or project error. Anything but 0 fails the gate.
+      - name: Enforce Snyk gate (HIGH and CRITICAL)
+        if: steps.preflight.outputs.run == 'true'
+        env:
+          SNYK_EXIT: ${{ steps.snyk_scan.outputs.exit_code }}
         run: |
-          docker build \
-            -t lean-devsecops-pipeline:${{ github.sha }} \
-            .
+          if [[ "$SNYK_EXIT" == "0" ]]; then
+            echo "Snyk: no HIGH or CRITICAL findings."
+          elif [[ "$SNYK_EXIT" == "1" ]]; then
+            echo "::error::Snyk found HIGH or CRITICAL vulnerabilities. See the snyk-scan-reports artifact."
+            exit 1
+          else
+            echo "::error::Snyk scan itself failed (exit code '$SNYK_EXIT')."
+            exit 1
+          fi
 
-      - name: Scan Docker image with Trivy
-        id: trivy_scan
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+  # ---------------------------------------------------------------------------
+  # Stage 4: Build the container image (multi-stage, non-root, healthcheck)
+  # ---------------------------------------------------------------------------
+  container-build:
+    name: "4 - Container build"
+    needs: build-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v5
 
+      - name: Build Docker image
+        run: docker build -t "$IMAGE_NAME:$IMAGE_TAG" .
+
+      - name: Report image size and base
+        run: |
+          docker images "$IMAGE_NAME:$IMAGE_TAG" --format 'Image size: {{.Size}}'
+          docker image inspect "$IMAGE_NAME:$IMAGE_TAG" --format 'Runs as user: {{.Config.User}}'
+          {
+            echo "### Container image"
+            docker images "$IMAGE_NAME:$IMAGE_TAG" --format '- Size: **{{.Size}}**'
+            docker image inspect "$IMAGE_NAME:$IMAGE_TAG" --format '- User: `{{.Config.User}}`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save image for downstream jobs
+        run: docker save "$IMAGE_NAME:$IMAGE_TAG" -o image.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v6
         with:
-          image-ref: lean-devsecops-pipeline:${{ github.sha }}
+          name: container-image
+          path: image.tar
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # Stage 5: Container scan - Trivy
+  # ---------------------------------------------------------------------------
+  container-scan-trivy:
+    name: "5 - Container scan (Trivy)"
+    needs: container-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write # required by upload-sarif
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: container-image
+
+      - name: Load image
+        run: docker load -i image.tar
+
+      # Step 1: produce the SARIF report. exit-code 0 here only so the report
+      # is always uploaded; the enforcing scan is the step after the upload.
+      - name: Trivy scan (SARIF report)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           format: sarif
           output: trivy.sarif
           severity: HIGH,CRITICAL
+          limit-severities-for-sarif: true
           ignore-unfixed: true
-          exit-code: "1"
+          exit-code: "0"
 
       - name: Upload Trivy report
         if: always() && hashFiles('trivy.sarif') != ''
@@ -123,34 +308,110 @@ jobs:
         with:
           name: trivy-scan-report
           path: trivy.sarif
-          if-no-files-found: warn
 
-      - name: Upload Trivy results to GitHub Security
+      - name: Upload Trivy results to GitHub Code Scanning
         if: always() && hashFiles('trivy.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy.sarif
           category: trivy-container
 
-      - name: Enforce security gates
-        if: always()
-        shell: bash
+      # Step 2: the enforcing scan. Same severity and filters; fails the job.
+      - name: Enforce Trivy gate (HIGH and CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-setup-trivy: true
+
+  # ---------------------------------------------------------------------------
+  # Stage 6: DAST - OWASP ZAP baseline scan against the running container
+  # Runs only after build, SAST, SCA and the container scan have all passed.
+  # ---------------------------------------------------------------------------
+  dast-zap:
+    name: "6 - DAST (OWASP ZAP)"
+    needs: [sast-sonarcloud, sca-snyk, container-scan-trivy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source code (for ZAP rules)
+        uses: actions/checkout@v5
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: container-image
+
+      - name: Load image
+        run: docker load -i image.tar
+
+      - name: Start application container
         run: |
-          gate_failed=0
+          docker run -d --name app -p 8080:8080 "$IMAGE_NAME:$IMAGE_TAG"
 
-          if [[ "${{ steps.snyk_scan.outcome }}" == "failure" ]]; then
-            echo "::error::Snyk detected a high or critical dependency vulnerability, or the scan failed."
-            gate_failed=1
-          fi
+      - name: Wait for the application to respond
+        run: |
+          for i in $(seq 1 40); do
+            if curl --fail --silent http://localhost:8080/actuator/health; then
+              echo
+              echo "Application is up after ~$((i * 3))s."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::Application did not become healthy within 120s."
+          docker logs app
+          exit 1
 
-          if [[ "${{ steps.trivy_scan.outcome }}" == "failure" ]]; then
-            echo "::error::Trivy detected a high or critical container vulnerability, or the scan failed."
-            gate_failed=1
-          fi
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: http://localhost:8080
+          rules_file_name: .zap/rules.tsv
+          allow_issue_writing: false
+          artifact_name: zap-baseline-report
+          fail_action: false
 
-          if [[ "$gate_failed" -ne 0 ]]; then
-            echo "Security policy failed. Review the uploaded Snyk and Trivy reports."
+      - name: Show application logs
+        if: always()
+        run: docker logs app || true
+
+      - name: Stop application container
+        if: always()
+        run: docker rm -f app || true
+
+  # ---------------------------------------------------------------------------
+  # Stage 7: Final security gate. Single required check.
+  # Passes ONLY if every stage succeeded. A skipped/cancelled/failed stage
+  # fails the gate (the old gate passed when upstream stages were skipped).
+  # ---------------------------------------------------------------------------
+  security-gate:
+    name: "7 - Security gate"
+    if: always()
+    needs:
+      - build-test
+      - sast-sonarcloud
+      - sca-snyk
+      - container-build
+      - container-scan-trivy
+      - dast-zap
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Evaluate stage results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq -r '[to_entries[] | select(.value.result != "success")] | length')
+          if [[ "$bad" -ne 0 ]]; then
+            echo "::error::Security gate FAILED: at least one stage did not succeed."
             exit 1
           fi
-
-          echo "All security gates passed."
+          echo "All security stages passed."
